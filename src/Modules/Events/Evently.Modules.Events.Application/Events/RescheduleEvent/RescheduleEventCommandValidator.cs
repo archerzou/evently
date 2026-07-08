@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+﻿using Evently.Modules.Events.Application.Events.RescheduleEvent;
+using FluentValidation;
 
 namespace Evently.Modules.Events.Application.Events.ResheduleEvent;
 

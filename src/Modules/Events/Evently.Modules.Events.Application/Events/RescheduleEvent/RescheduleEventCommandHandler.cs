@@ -4,7 +4,7 @@ using Evently.Modules.Events.Application.Abstractions.Messaging;
 using Evently.Modules.Events.Domain.Abstractions;
 using Evently.Modules.Events.Domain.Events;
 
-namespace Evently.Modules.Events.Application.Events.ResheduleEvent;
+namespace Evently.Modules.Events.Application.Events.RescheduleEvent;
 
 internal sealed class RescheduleEventCommandHandler(
     IDateTimeProvider dateTimeProvider,

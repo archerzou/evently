@@ -1,6 +1,6 @@
 ﻿using FluentValidation;
 
-namespace Evently.Modules.Events.Application.Categories.updateCategory;
+namespace Evently.Modules.Events.Application.Categories.UpdateCategory;
 
 internal sealed class UpdateCategoryCommandValidator : AbstractValidator<UpdateCategoryCommand>
 {

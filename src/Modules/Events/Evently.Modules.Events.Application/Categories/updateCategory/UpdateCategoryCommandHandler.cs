@@ -3,7 +3,7 @@ using Evently.Modules.Events.Application.Abstractions.Messaging;
 using Evently.Modules.Events.Domain.Abstractions;
 using Evently.Modules.Events.Domain.Categories;
 
-namespace Evently.Modules.Events.Application.Categories.updateCategory;
+namespace Evently.Modules.Events.Application.Categories.UpdateCategory;
 
 internal sealed class UpdateCategoryCommandHandler(ICategoryRepository categoryRepository, IUnitOfWork unitOfWork)
     : ICommandHandler<UpdateCategoryCommand>

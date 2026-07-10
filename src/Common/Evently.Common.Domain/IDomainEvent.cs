@@ -1,4 +1,4 @@
-﻿namespace Evently.Modules.Events.Domain.Abstractions;
+﻿namespace Evently.Common.Domain;
 
 public interface IDomainEvent
 {
@@ -6,4 +6,3 @@ public interface IDomainEvent
 
     DateTime OccurredOnUtc { get; }
 }
-

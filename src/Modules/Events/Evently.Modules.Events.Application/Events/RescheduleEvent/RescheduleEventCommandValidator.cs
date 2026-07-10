@@ -1,7 +1,6 @@
-﻿using Evently.Modules.Events.Application.Events.RescheduleEvent;
-using FluentValidation;
+﻿using FluentValidation;
 
-namespace Evently.Modules.Events.Application.Events.ResheduleEvent;
+namespace Evently.Modules.Events.Application.Events.RescheduleEvent;
 
 internal sealed class RescheduleEventCommandValidator : AbstractValidator<RescheduleEventCommand>
 {

@@ -1,9 +1,8 @@
 ﻿using System.Data.Common;
 
-namespace Evently.Modules.Events.Application.Abstractions.Data;
+namespace Evently.Common.Application.Data;
 
 public interface IDbConnectionFactory
 {
     ValueTask<DbConnection> OpenConnectionAsync();
 }
-

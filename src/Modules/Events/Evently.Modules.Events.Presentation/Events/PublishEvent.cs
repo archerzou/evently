@@ -17,7 +17,7 @@ internal sealed class PublishEvent : IEndpoint
         {
             Result result = await sender.Send(new PublishEventCommand(id));
 
-            return result.Match(Results.NoContent, ApiResults.ApiResults.Problem);
+            return result.Match(Results.NoContent, ApiResults.Problem);
         })
         .WithTags(Tags.Events);
     }

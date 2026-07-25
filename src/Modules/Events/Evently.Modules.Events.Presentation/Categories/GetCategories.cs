@@ -18,7 +18,7 @@ internal sealed class GetCategories : IEndpoint
         {
             Result<IReadOnlyCollection<CategoryResponse>> result = await sender.Send(new GetCategoriesQuery());
 
-            return result.Match(Results.Ok, ApiResults.ApiResults.Problem);
+            return result.Match(Results.Ok, ApiResults.Problem);
         })
         .WithTags(Tags.Categories);
     }

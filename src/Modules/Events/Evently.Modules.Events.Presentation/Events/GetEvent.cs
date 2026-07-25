@@ -17,7 +17,7 @@ internal sealed class GetEvent : IEndpoint
         {
             Result<EventResponse> result = await sender.Send(new GetEventQuery(id));
 
-            return result.Match(Results.Ok, ApiResults.ApiResults.Problem);
+            return result.Match(Results.Ok, ApiResults.Problem);
         })
         .WithTags(Tags.Events);
     }

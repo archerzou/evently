@@ -19,7 +19,7 @@ internal sealed class GetTicketTypes : IEndpoint
             Result<IReadOnlyCollection<TicketTypeResponse>> result = await sender.Send(
                 new GetTicketTypesQuery(eventId));
 
-            return result.Match(Results.Ok, ApiResults.ApiResults.Problem);
+            return result.Match(Results.Ok, ApiResults.Problem);
         })
         .WithTags(Tags.TicketTypes);
     }

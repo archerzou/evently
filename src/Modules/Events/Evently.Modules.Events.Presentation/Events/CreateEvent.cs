@@ -23,7 +23,7 @@ internal sealed class CreateEvent : IEndpoint
                 request.StartsAtUtc,
                 request.EndsAtUtc));
 
-            return result.Match(Results.Ok, ApiResults.ApiResults.Problem);    
+            return result.Match(Results.Ok, ApiResults.Problem);    
         })
         .WithTags(Tags.Events);
     }

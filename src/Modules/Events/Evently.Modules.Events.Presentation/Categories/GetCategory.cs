@@ -17,7 +17,7 @@ internal sealed class GetCategory : IEndpoint
         {
             Result<CategoryResponse> result = await sender.Send(new GetCategoryQuery(id));
 
-            return result.Match(Results.Ok, ApiResults.ApiResults.Problem);
+            return result.Match(Results.Ok, ApiResults.Problem);
         })
         .WithTags(Tags.Categories);
     }

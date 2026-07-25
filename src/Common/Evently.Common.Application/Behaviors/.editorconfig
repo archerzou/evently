@@ -1,0 +1,5 @@
+# Logging pipeline behaviors pass only cheap, cached values (e.g. typeof(T).Name)
+# as log arguments, so guarding every Information-level call with IsEnabled adds
+# noise without saving meaningful work. Disable CA1873 for this folder.
+[*.cs]
+dotnet_diagnostic.CA1873.severity = none

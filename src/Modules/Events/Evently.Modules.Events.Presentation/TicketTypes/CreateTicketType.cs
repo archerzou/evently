@@ -1,6 +1,7 @@
-﻿using Evently.Modules.Events.Application.TicketTypes.CreateTicketType;
-using Evently.Modules.Events.Domain.Abstractions;
-using Evently.Modules.Events.Presentation.ApiResults;
+﻿using Evently.Common.Domain;
+using Evently.Common.Presentation.ApiResults;
+using Evently.Common.Presentation.Endpoints;
+using Evently.Modules.Events.Application.TicketTypes.CreateTicketType;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,9 +9,9 @@ using Microsoft.AspNetCore.Routing;
 
 namespace Evently.Modules.Events.Presentation.TicketTypes;
 
-internal static class CreateTicketType
+internal sealed class CreateTicketType : IEndpoint
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app)
+    public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("ticket-types", async (Request request, ISender sender) =>
         {

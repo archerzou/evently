@@ -1,14 +1,17 @@
-﻿using Evently.Modules.Events.Domain.Abstractions;
+﻿using Evently.Common.Domain;
 
 namespace Evently.Modules.Events.Domain.Categories;
 
-public sealed class Category: Entity
+public sealed class Category : Entity
 {
     private Category()
     {
     }
+
     public Guid Id { get; private set; }
+
     public string Name { get; private set; }
+
     public bool IsArchived { get; private set; }
 
     public static Category Create(string name)

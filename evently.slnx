@@ -19,6 +19,7 @@
     <Project Path="src/Modules/Events/Evently.Modules.Events.Domain/Evently.Modules.Events.Domain.csproj" Id="2d1c2861-262d-4039-b7de-e2a5b4663299" />
     <Project Path="src/Modules/Events/Evently.Modules.Events.Infrastructure/Evently.Modules.Events.Infrastructure.csproj" Id="9317ac64-6a3c-4645-baf9-510af217d30c" />
     <Project Path="src/Modules/Events/Evently.Modules.Events.Presentation/Evently.Modules.Events.Presentation.csproj" Id="aa2fffca-aa68-4a5a-82fa-04b49c6b48ab" />
+    <Project Path="src/Modules/Events/Evently.Modules.Events.PublicApi/Evently.Modules.Events.PublicApi.csproj" Id="c68deed2-2d29-4221-92e1-c42552f51088" />
   </Folder>
   <Folder Name="/src/Modules/Ticketing/">
     <Project Path="src/Modules/Ticketing/Evently.Modules.Ticketing.Application/Evently.Modules.Ticketing.Application.csproj" />
@@ -31,6 +32,7 @@
     <Project Path="src/Modules/Users/Evently.Modules.Users.Domain/Evently.Modules.Users.Domain.csproj" />
     <Project Path="src/Modules/Users/Evently.Modules.Users.Infrastructure/Evently.Modules.Users.Infrastructure.csproj" />
     <Project Path="src/Modules/Users/Evently.Modules.Users.Presentation/Evently.Modules.Users.Presentation.csproj" />
+    <Project Path="src/Modules/Users/Evently.Modules.Users.PublicApi/Evently.Modules.Users.PublicApi.csproj" Id="72ba6e92-be42-4ae1-824f-00fd77e21df5" />
   </Folder>
   <Project Path="docker-compose.dcproj">
     <Build />

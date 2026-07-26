@@ -1,4 +1,5 @@
 ﻿using Evently.Common.Presentation.Endpoints;
+using Evently.Modules.Ticketing.Application.Carts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,11 +18,10 @@ public static class TicketingModule
         return services;
     }
 
-#pragma warning disable IDE0060
+#pragma warning disable S1172, IDE0060 // 'configuration' is unused until this module's persistence is implemented
     private static void AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+#pragma warning restore S1172, IDE0060
     {
-        // Scaffold: DbContext, repositories, and other infrastructure will be registered here.
-        // Parameters are unused until then.
+        services.AddSingleton<CartService>();
     }
-#pragma warning restore IDE0060
 }

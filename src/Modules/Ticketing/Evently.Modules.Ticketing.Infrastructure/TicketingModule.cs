@@ -1,5 +1,14 @@
-﻿using Evently.Common.Presentation.Endpoints;
+﻿using Evently.Common.Infrastructure.Interceptors;
+using Evently.Common.Presentation.Endpoints;
+using Evently.Modules.Ticketing.Application.Abstractions.Data;
 using Evently.Modules.Ticketing.Application.Carts;
+using Evently.Modules.Ticketing.Domain.Customers;
+using Evently.Modules.Ticketing.Infrastructure.Customers;
+using Evently.Modules.Ticketing.Infrastructure.Database;
+using Evently.Modules.Ticketing.Presentation.Customers;
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,10 +27,26 @@ public static class TicketingModule
         return services;
     }
 
-#pragma warning disable S1172, IDE0060 // 'configuration' is unused until this module's persistence is implemented
-    private static void AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
-#pragma warning restore S1172, IDE0060
+    public static void ConfigureConsumers(IRegistrationConfigurator registrationConfigurator)
     {
+        registrationConfigurator.AddConsumer<UserRegisteredIntegrationEventConsumer>();
+    }
+
+    private static void AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddDbContext<TicketingDbContext>((sp, options) =>
+            options
+                .UseNpgsql(
+                    configuration.GetConnectionString("Database"),
+                    npgsqlOptions => npgsqlOptions
+                        .MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Ticketing))
+                .AddInterceptors(sp.GetRequiredService<PublishDomainEventsInterceptor>())
+                .UseSnakeCaseNamingConvention());
+
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
+
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<TicketingDbContext>());
+
         services.AddSingleton<CartService>();
     }
 }

@@ -1,5 +1,5 @@
 ﻿using Evently.Common.Domain;
-using Evently.Common.Presentation.ApiResults;
+using Evently.Common.Presentation.Results;
 using Evently.Common.Presentation.Endpoints;
 using Evently.Modules.Events.Application.Categories.ArchiveCategory;
 using MediatR;
@@ -17,7 +17,7 @@ internal sealed class ArchiveCategory : IEndpoint
         {
             Result result = await sender.Send(new ArchiveCategoryCommand(id));
 
-            return result.Match(() => Results.Ok(), ApiResults.ApiResults.Problem);
+            return result.Match(() => Results.Ok(), ApiResults.Problem);
         })
         .WithTags(Tags.Categories);
     }

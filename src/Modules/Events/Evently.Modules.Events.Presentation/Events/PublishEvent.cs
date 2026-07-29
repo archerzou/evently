@@ -1,5 +1,5 @@
 ﻿using Evently.Common.Domain;
-using Evently.Common.Presentation.ApiResults;
+using Evently.Common.Presentation.Results;
 using Evently.Common.Presentation.Endpoints;
 using Evently.Modules.Events.Application.Events.PublishEvent;
 using MediatR;
@@ -17,7 +17,7 @@ internal sealed class PublishEvent : IEndpoint
         {
             Result result = await sender.Send(new PublishEventCommand(id));
 
-            return result.Match(Results.NoContent, ApiResults.ApiResults.Problem);
+            return result.Match(Results.NoContent, ApiResults.Problem);
         })
         .WithTags(Tags.Events);
     }

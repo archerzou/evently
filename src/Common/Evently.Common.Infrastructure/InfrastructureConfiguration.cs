@@ -1,10 +1,12 @@
 ﻿using Evently.Common.Application.Caching;
 using Evently.Common.Application.Clock;
 using Evently.Common.Application.Data;
+using Evently.Common.Application.EventBus;
 using Evently.Common.Infrastructure.Caching;
 using Evently.Common.Infrastructure.Clock;
 using Evently.Common.Infrastructure.Data;
 using Evently.Common.Infrastructure.Interceptors;
+using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
@@ -16,6 +18,7 @@ public static class InfrastructureConfiguration
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
+        Action<IRegistrationConfigurator>[] moduleConfigureConsumers,
         string databaseConnectionString,
         string redisConnectionString)
     {
@@ -28,13 +31,38 @@ public static class InfrastructureConfiguration
 
         services.TryAddSingleton<IDateTimeProvider, DateTimeProvider>();
 
-        IConnectionMultiplexer connectionMultiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
-        services.TryAddSingleton(connectionMultiplexer);
+        try
+        {
+            IConnectionMultiplexer connectionMultiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
+            services.TryAddSingleton(connectionMultiplexer);
 
-        services.AddStackExchangeRedisCache(options =>
-            options.ConnectionMultiplexerFactory = () => Task.FromResult(connectionMultiplexer));
+            services.AddStackExchangeRedisCache(options =>
+                options.ConnectionMultiplexerFactory = () => Task.FromResult(connectionMultiplexer));
+        }
+        catch
+        {
+            services.AddDistributedMemoryCache();
+        }
 
         services.TryAddSingleton<ICacheService, CacheService>();
+
+        services.TryAddSingleton<IEventBus, EventBus.EventBus>();
+
+        services.AddMassTransit(configure =>
+        {
+            foreach (Action<IRegistrationConfigurator> configureConsumer in moduleConfigureConsumers)
+            {
+                configureConsumer(configure);
+            }
+
+            configure.SetKebabCaseEndpointNameFormatter();
+
+            configure.UsingInMemory((context, cfg) =>
+            {
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+
 
         return services;
     }

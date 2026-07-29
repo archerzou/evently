@@ -1,5 +1,5 @@
 ﻿using Evently.Common.Domain;
-using Evently.Common.Presentation.ApiResults;
+using Evently.Common.Presentation.Results;
 using Evently.Common.Presentation.Endpoints;
 using Evently.Modules.Events.Application.Categories.GetCategory;
 using MediatR;
@@ -17,7 +17,7 @@ internal sealed class GetCategory : IEndpoint
         {
             Result<CategoryResponse> result = await sender.Send(new GetCategoryQuery(id));
 
-            return result.Match(Results.Ok, ApiResults.ApiResults.Problem);
+            return result.Match(Results.Ok, ApiResults.Problem);
         })
         .WithTags(Tags.Categories);
     }

@@ -1,5 +1,5 @@
 ﻿using Evently.Common.Domain;
-using Evently.Common.Presentation.ApiResults;
+using Evently.Common.Presentation.Results;
 using Evently.Common.Presentation.Endpoints;
 using Evently.Modules.Events.Application.Events.RescheduleEvent;
 using MediatR;
@@ -18,7 +18,7 @@ internal sealed class RescheduleEvent : IEndpoint
             Result result = await sender.Send(
                 new RescheduleEventCommand(id, request.StartsAtUtc, request.EndsAtUtc));
 
-            return result.Match(Results.NoContent, ApiResults.ApiResults.Problem);
+            return result.Match(Results.NoContent, ApiResults.Problem);
         })
         .WithTags(Tags.Events);
     }

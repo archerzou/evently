@@ -1,5 +1,5 @@
 ﻿using Evently.Common.Domain;
-using Evently.Common.Presentation.ApiResults;
+using Evently.Common.Presentation.Results;
 using Evently.Common.Presentation.Endpoints;
 using Evently.Modules.Events.Application.Events.CreateEvent;
 using MediatR;
@@ -23,7 +23,7 @@ internal sealed class CreateEvent : IEndpoint
                 request.StartsAtUtc,
                 request.EndsAtUtc));
 
-            return result.Match(Results.Ok, ApiResults.ApiResults.Problem);    
+            return result.Match(Results.Ok, ApiResults.Problem);    
         })
         .WithTags(Tags.Events);
     }

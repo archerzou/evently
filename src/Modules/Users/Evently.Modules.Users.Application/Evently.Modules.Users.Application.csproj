@@ -6,4 +6,8 @@
     <ProjectReference Include="..\Evently.Modules.Users.IntegrationEvents\Evently.Modules.Users.IntegrationEvents.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Abstractions\Identity\" />
+  </ItemGroup>
+
 </Project>

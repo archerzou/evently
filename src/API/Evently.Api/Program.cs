@@ -39,10 +39,19 @@ builder.Services.AddInfrastructure(
 
 builder.Configuration.AddModuleConfiguration(["events", "users", "ticketing"]);
 
+// Module JSON files are added last, so they would otherwise override user secrets and
+// environment variables. Re-add them here so secrets stay out of source control.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>();
+}
+
+builder.Configuration.AddEnvironmentVariables();
+
 builder.Services.AddHealthChecks()
     .AddNpgSql(databaseConnectionString)
-    .AddRedis(redisConnectionString);
-
+    .AddRedis(redisConnectionString)
+    .AddUrlGroup(new Uri(builder.Configuration.GetValue<string>("KeyCloak:HealthUrl")!), HttpMethod.Get, "keycloak");
 
 builder.Services.AddEventsModule(builder.Configuration);
 
@@ -70,5 +79,9 @@ app.MapHealthChecks("health", new HealthCheckOptions
 app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
+
+app.UseAuthentication();
+
+app.UseAuthorization();
 
 app.Run();

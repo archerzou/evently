@@ -1,0 +1,8 @@
+# EF Core generates these files; relax style/analyzer rules that don't apply to generated code.
+[*.cs]
+# IDE0161: Convert to file-scoped namespace (EF generates block-scoped)
+dotnet_diagnostic.IDE0161.severity = none
+# S1186: Methods should not be empty (empty Up/Down in no-op migrations)
+dotnet_diagnostic.S1186.severity = none
+# S4581: "new Guid()" should not be used (EF emits Guid defaults for FK columns)
+dotnet_diagnostic.S4581.severity = none

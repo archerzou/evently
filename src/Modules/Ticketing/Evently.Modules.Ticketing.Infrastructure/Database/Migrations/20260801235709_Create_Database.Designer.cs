@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Evently.Modules.Ticketing.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(TicketingDbContext))]
-    [Migration("20260729093639_Create_Database")]
+    [Migration("20260801235709_Create_Database")]
     partial class Create_Database
     {
         /// <inheritdoc />

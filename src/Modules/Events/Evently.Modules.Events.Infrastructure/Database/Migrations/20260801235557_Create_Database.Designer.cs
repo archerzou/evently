@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Evently.Modules.Events.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(EventsDbContext))]
-    [Migration("20260709232604_Add_Categories_TicketTypes")]
-    partial class Add_Categories_TicketTypes
+    [Migration("20260801235557_Create_Database")]
+    partial class Create_Database
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

@@ -1,8 +1,8 @@
 # Evently
 
-A production-grade event management REST API built on **.NET 8** and **ASP.NET Core Minimal APIs**, demonstrating how to evolve a vertical-slice monolith into a **Modular Monolith** using **Clean Architecture** and key principles from **Domain-Driven Design (DDD)**.
+An event ticketing platform built on **.NET 8** and **ASP.NET Core Minimal APIs**, demonstrating how to evolve a vertical-slice monolith into a **Modular Monolith** using **Clean Architecture** and key principles from **Domain-Driven Design (DDD)**.
 
-The project serves as a reference implementation for teams who want the development simplicity of a monolith while retaining the seam lines that allow future extraction into microservices — without the distributed-systems tax paid upfront.
+Three modules — **Events**, **Users**, and **Ticketing** — sit on a shared **Common** layer, each owning its own database schema and communicating only through explicit contracts. The result keeps the development simplicity of a monolith while preserving the seam lines that make future extraction into services tractable.
 
 ---
 
@@ -10,16 +10,19 @@ The project serves as a reference implementation for teams who want the developm
 
 1. [The Architecture Decision](#the-architecture-decision)
 2. [Project Structure](#project-structure)
-3. [Module Anatomy: Events](#module-anatomy-events)
-4. [Domain Model](#domain-model)
-5. [CQRS and the Dual-ORM Strategy](#cqrs-and-the-dual-orm-strategy)
-6. [Technology Stack](#technology-stack)
-7. [API Reference](#api-reference)
-8. [Getting Started](#getting-started)
-9. [Configuration](#configuration)
-10. [Database Migrations](#database-migrations)
-11. [Design Decisions & Trade-offs](#design-decisions--trade-offs)
-12. [Known Gaps & Roadmap](#known-gaps--roadmap)
+3. [Module Anatomy](#module-anatomy)
+4. [Module Communication](#module-communication)
+5. [Domain Model](#domain-model)
+6. [CQRS and the Dual-ORM Strategy](#cqrs-and-the-dual-orm-strategy)
+7. [Cross-Cutting Concerns](#cross-cutting-concerns)
+8. [Authentication & Authorization](#authentication--authorization)
+9. [Technology Stack](#technology-stack)
+10. [API Reference](#api-reference)
+11. [Getting Started](#getting-started)
+12. [Configuration](#configuration)
+13. [Database Migrations](#database-migrations)
+14. [Design Decisions & Trade-offs](#design-decisions--trade-offs)
+15. [Known Gaps & Roadmap](#known-gaps--roadmap)
 
 ---
 
@@ -27,238 +30,239 @@ The project serves as a reference implementation for teams who want the developm
 
 ### Why Modular Monolith?
 
-The classic monolith accumulates coupling over time. Every class can reference every other class; database tables share a single schema; the only seam is the deployment unit itself. The result is a big ball of mud that cannot be safely changed, tested in isolation, or extracted into services when scaling demands it.
-
-Microservices solve the coupling problem but introduce a different class of problems: distributed transactions, network latency, operational complexity, and the need for mature DevOps tooling from day one. For a team at the start of a product's lifecycle — before the domain is well-understood — paying the microservices tax is almost always the wrong bet.
+The classic monolith accumulates coupling: every class can reference every other, all tables share one schema, and the only seam is the deployment unit. Microservices solve coupling but introduce distributed transactions, network latency, and operational overhead — a heavy price before the domain is well understood.
 
 **Modular Monolith** is the middle path:
 
-- **Single deployable unit** (no distributed systems complexity)
+- **Single deployable unit** — no distributed systems complexity
 - **Hard module boundaries** enforced at the project/assembly level
-- **No shared mutable state** between modules (each module owns its own database schema)
-- **Communication contracts** defined up front, making future extraction tractable
+- **No shared database state** — each module owns a Postgres schema (`events`, `users`, `ticketing`)
+- **Explicit contracts** between modules, so extraction later is mechanical rather than archaeological
 
-When traffic demands extraction, a module becomes a microservice: you deploy its Infrastructure layer separately and replace in-process calls with HTTP or message broker calls. The application and domain layers move with zero changes.
+When a module needs to become a service, its application and domain layers move unchanged; only the infrastructure wiring is replaced.
 
 ### Why Clean Architecture?
 
-Clean Architecture (popularized by Robert C. Martin) enforces a single rule: **dependencies point inward**. The domain is the innermost layer and has no dependency on any framework, ORM, or database. This makes it:
-
-- **Testable in isolation** — domain logic can be unit-tested without a database
-- **Framework-agnostic** — swapping EF Core for another ORM does not touch the domain
-- **Explicit about contracts** — the application layer defines interfaces the infrastructure must satisfy
+Dependencies point inward. The domain has no dependency on any framework, ORM, or database, which makes it testable in isolation and framework-agnostic. The application layer defines interfaces that infrastructure must satisfy.
 
 ### Why Domain-Driven Design?
 
-DDD is applied *selectively*, not dogmatically. The project uses:
+DDD is applied selectively:
 
-- **Aggregate Roots** — `Event` is the aggregate root; it controls its own invariants and lifecycle
-- **Factory Methods** — `Event.Create(...)` is the only way to construct a valid event
-- **Domain Events** — `EventCreatedDomainEvent` is raised inside the aggregate; it can be consumed by other modules or published to a message broker without changing the domain
-- **Repository Pattern** — the domain defines `IEventRepository`; the infrastructure satisfies it
+- **Aggregate Roots** — `Event`, `Order`, `Payment`, `Ticket`, `User` control their own invariants
+- **Factory Methods** — `Order.Create(...)` is the only way to construct a valid aggregate
+- **Domain Events** — raised inside aggregates, dispatched after commit
+- **Repository Pattern** — the domain declares the interface; infrastructure implements it
+- **Result Pattern** — expected failures return `Result`/`Result<T>`; exceptions are reserved for the genuinely unexpected
 
-DDD constructs that add ceremony without value (Value Objects for simple strings, bounded context maps) are deliberately deferred until the domain grows complex enough to justify them.
+Constructs that add ceremony without value are deliberately deferred.
 
 ---
 
 ## Project Structure
 
-```
+```text
 evently/
 ├── src/
 │   ├── API/
-│   │   └── Evently.Api/                        # Composition root — wires modules together
-│   │       ├── Program.cs
-│   │       ├── Extensions/
-│   │       │   └── MigrationExtensions.cs
-│   │       ├── appsettings.json
-│   │       ├── appsettings.Development.json
-│   │       └── Dockerfile
+│   │   └── Evently.Api/                    # Composition root
+│   │
+│   ├── Common/                             # Shared kernel (4 projects)
+│   │   ├── Evently.Common.Domain/          # Entity, Result, Error, DomainEvent
+│   │   ├── Evently.Common.Application/     # CQRS abstractions, behaviors, EventBus
+│   │   ├── Evently.Common.Infrastructure/  # Auth, caching, clock, interceptors
+│   │   └── Evently.Common.Presentation/    # IEndpoint, ApiResults
 │   │
 │   └── Modules/
-│       └── Events/                             # Self-contained Events module
-│           ├── Evently.Modules.Events.Domain/
-│           ├── Evently.Modules.Events.Application/
-│           ├── Evently.Modules.Events.Infrastructure/
-│           └── Evently.Modules.Events.Presentation/
+│       ├── Events/                         # Events, categories, ticket types
+│       ├── Users/                          # Registration, profiles, roles
+│       └── Ticketing/                      # Carts, orders, payments, tickets
 │
-├── evently.slnx                                # Solution file
-├── Directory.Build.props                       # Centralized MSBuild configuration
+├── .files/                                 # Keycloak realm export
 ├── docker-compose.yml
-└── docker-compose.override.yml
+└── Directory.Build.props
 ```
 
 ### The Dependency Rule
 
-Each project layer may only reference layers further inward. Outward references are compile-time errors.
-
+```text
+Common.Domain ◄── Common.Application ◄── Common.Infrastructure
+     ▲                    ▲                      ▲
+Module.Domain      Module.Application     Module.Infrastructure
+     ▲                    ▲                      │
+     └────────────────────┴── Module.Presentation┘
+                                                  ▲
+                                           Evently.Api
 ```
-Presentation  →  Application  →  Domain
-Infrastructure               →  Domain
-                 Application  ←  Infrastructure (via DI, not reference)
-API            →  Infrastructure (only for DI registration)
-```
 
-The API project references `Evently.Modules.Events.Infrastructure` solely to call `AddEventsModule()` and `MapEndpoints()`. It never references Domain or Application directly.
+No `Common.*` project references a module. No module references another module's internals — only its `PublicApi` or `IntegrationEvents` contract project.
 
 ---
 
-## Module Anatomy: Events
+## Module Anatomy
 
-Every module follows the same four-project template. This is intentional: adding a new module is copying the template and filling in the domain. The structure scales from one module to twenty without architectural drift.
+Every module follows the same template, so adding one is filling in a known shape rather than inventing a structure.
 
-### Domain Layer — `Evently.Modules.Events.Domain`
+| Project | References | Contains |
+|---|---|---|
+| **Domain** | Common.Domain | Aggregates, domain events, repository interfaces, errors |
+| **Application** | Common.Application, Domain | Commands, queries, handlers, validators |
+| **Infrastructure** | Common.Infrastructure, Application, Presentation | DbContext, EF configurations, repositories, module registration |
+| **Presentation** | Common.Presentation, Application | `IEndpoint` implementations |
+| **PublicApi** | Common.Domain | Cross-module read contracts (`IEventsApi`, `IUsersApi`) |
+| **IntegrationEvents** | Common.Application | Published event contracts (Users only, so far) |
 
-**No external dependencies.** This project references only the .NET BCL.
+Each module exposes up to two entry points to the host — registration, plus consumer
+configuration when the module subscribes to integration events:
 
-```
-Domain/
-├── Abstractions/
-│   ├── Entity.cs              # Base class: manages domain event collection
-│   ├── IDomainEvent.cs        # Marker interface: Id + OccurredOnUtc
-│   └── DomainEvent.cs         # Base record implementing IDomainEvent
-└── Events/
-    ├── Event.cs               # Aggregate root
-    ├── EventStatus.cs         # Enum: Draft, Published, Completed, Cancelled
-    ├── IEventRepository.cs    # Repository contract (dependency inversion)
-    └── EventCreatedDomainEvent.cs
-```
-
-### Application Layer — `Evently.Modules.Events.Application`
-
-**References Domain only.** Defines use cases as CQRS Commands/Queries dispatched via MediatR.
-
-```
-Application/
-├── AssemblyReference.cs       # Static marker for assembly scanning
-├── Abstractions/Data/
-│   ├── IUnitOfWork.cs         # Commit writes
-│   └── IDbConnectionFactory.cs # Open a read connection
-└── Events/
-    ├── CreateEvent/
-    │   ├── CreateEventCommand.cs         # IRequest<Guid>
-    │   ├── CreateEventCommandHandler.cs  # Orchestrates domain + persistence
-    │   └── CreateEventCommandValidator.cs # FluentValidation rules
-    └── GetEvent/
-        ├── GetEventQuery.cs              # IRequest<EventResponse?>
-        ├── GetEventQueryHandler.cs       # Raw SQL via Dapper
-        └── EventResponse.cs             # Read model / DTO
+```csharp
+public static IServiceCollection Add<Module>Module(this IServiceCollection services, IConfiguration configuration);
+public static void ConfigureConsumers(IRegistrationConfigurator registrationConfigurator);
 ```
 
-### Infrastructure Layer — `Evently.Modules.Events.Infrastructure`
+| Module | `Add<Module>Module` | `ConfigureConsumers` |
+|---|---|---|
+| Events | ✅ | — |
+| Users | ✅ | — |
+| Ticketing | ✅ | ✅ consumes `UserRegisteredIntegrationEvent` |
 
-**References Application and Domain.** Satisfies every interface the inner layers define.
+Endpoints are discovered by assembly scanning (`AddEndpoints`) and mapped globally by `app.MapEndpoints()` — modules never touch the host's routing directly.
 
+---
+
+## Module Communication
+
+Two mechanisms, chosen by whether the caller needs an answer:
+
+**Synchronous reads — `PublicApi` projects.** When Ticketing needs event data, it depends on `Evently.Modules.Events.PublicApi` (an interface plus DTOs), never on `Events.Domain`. The implementation lives in the owning module's infrastructure.
+
+**Asynchronous notifications — integration events over MassTransit.** When something noteworthy happens, the owning module publishes an `IntegrationEvent`; interested modules consume it:
+
+```text
+Users:      UserRegisteredDomainEvent → UserRegisteredIntegrationEvent  ──┐
+                                                                          │  MassTransit
+Ticketing:  UserRegisteredIntegrationEventConsumer → creates Customer  ◄──┘
 ```
-Infrastructure/
-├── EventsModule.cs            # DI registration + endpoint wiring (public API of the module)
-├── Database/
-│   ├── EventsDbContext.cs     # EF Core context — also implements IUnitOfWork
-│   ├── Schemas.cs             # Schema name constant: "events"
-│   └── Migrations/            # EF Core migration files
-├── Data/
-│   └── DbConnectionFactory.cs # Implements IDbConnectionFactory via NpgsqlDataSource
-└── Events/
-    └── EventRepository.cs     # Implements IEventRepository via EF Core DbSet
-```
 
-### Presentation Layer — `Evently.Modules.Events.Presentation`
+The bus is currently **in-memory** (`loopback://`), so swapping to RabbitMQ or Azure Service Bus is a configuration change in `InfrastructureConfiguration`, not a code change in modules.
 
-**References Application only** (via MediatR's `ISender`). Converts HTTP requests into Commands/Queries; converts results back to HTTP responses.
-
-```
-Presentation/
-├── Tags.cs                    # Swagger grouping constant
-└── Events/
-    ├── EventEndpoints.cs      # Registers all event endpoints
-    ├── CreateEvent.cs         # POST /events
-    └── GetEvent.cs            # GET  /events/{id}
-```
+Domain events stay **inside** a module. Integration events cross module boundaries. Keeping these distinct is what stops modules from leaking into each other.
 
 ---
 
 ## Domain Model
 
-### The `Event` Aggregate
+### Events module
+`Event` (aggregate root) with lifecycle `Draft → Published → Completed/Cancelled`, plus `Category` and `TicketType`.
+
+### Users module
+`User` with `IdentityId` linking to Keycloak, and a `Role`/`Permission` model backing authorization.
+
+### Ticketing module
+The richest domain: `Customer`, `Event`/`TicketType` (local read models), `Order` + `OrderItem`, `Payment`, `Ticket`.
 
 ```csharp
-public sealed class Event : Entity
+public static Ticket Create(Order order, TicketType ticketType)
 {
-    public Guid Id { get; private set; }
-    public string Title { get; private set; }
-    public string Description { get; private set; }
-    public string Location { get; private set; }
-    public DateTime StartsAtUtc { get; private set; }
-    public DateTime? EndsAtUtc { get; private set; }
-    public EventStatus Status { get; private set; }
+    var ticket = new Ticket
+    {
+        Id = Guid.NewGuid(),
+        CustomerId = order.CustomerId,
+        Code = $"tc_{Ulid.NewUlid()}",     // sortable, URL-safe
+        CreatedAtUtc = DateTime.UtcNow
+    };
 
-    public static Event Create(string title, string description, string location,
-                               DateTime startsAtUtc, DateTime? endsAtUtc)
+    ticket.Raise(new TicketCreatedDomainEvent(ticket.Id));
+    return ticket;
 }
 ```
 
-**Key design decisions:**
-
-- **Private setters** — state can only change through methods defined on the aggregate. No external code can set `Status = Cancelled` directly; it must call a future `Cancel()` method that enforces business rules.
-- **Static factory method** — `Event.Create()` is the single entry point for creating a valid event. Constructors are private/parameterless (required by EF Core); this prevents invalid object construction from anywhere else in the codebase.
-- **Raises domain event on creation** — `EventCreatedDomainEvent` is appended to the entity's event collection inside `Create()`. The infrastructure layer can publish these events after the transaction commits.
-
-### Domain Events
+**Key patterns:** private setters (state changes only through methods), static factories (no invalid construction), domain events raised inside the aggregate, and `Result` returns for rule violations:
 
 ```csharp
-public interface IDomainEvent
+public Result IssueTickets()
 {
-    Guid Id { get; }
-    DateTime OccurredOnUtc { get; }
-}
+    if (TicketsIssued)
+    {
+        return Result.Failure(OrderErrors.TicketsAlreadyIssued);
+    }
 
-public sealed record EventCreatedDomainEvent(Guid EventId) : DomainEvent;
+    TicketsIssued = true;
+    Raise(new OrderTicketsIssuedDomainEvent(Id));
+
+    return Result.Success();
+}
 ```
 
-Domain events are raised *inside* the aggregate — which means they fire whether the call comes from an HTTP request, a background job, or a test. The aggregate has no idea what happens next; it only records that something significant occurred. This decoupling is the foundation for:
-
-- Notifying other modules (e.g., Notifications module sends a confirmation email)
-- Projecting read models
-- Publishing integration events to a message broker
-
-Currently, events are raised but not yet dispatched — see [Known Gaps](#known-gaps--roadmap).
+Domain events are dispatched by `PublishDomainEventsInterceptor`, an EF Core `SaveChangesInterceptor` that collects events from tracked entities after commit and publishes them via MediatR.
 
 ---
 
 ## CQRS and the Dual-ORM Strategy
 
-The project applies **Command Query Responsibility Segregation** not just as a naming convention but as a real infrastructure split.
+CQRS is applied as a real infrastructure split, not just naming.
 
-### Writes: EF Core
+**Writes → EF Core.** Change tracking suits aggregates with child collections; `IUnitOfWork` wraps the transaction; migrations manage schema.
 
-Commands go through EF Core (`EventsDbContext`) because:
-
-- EF Core's change tracking is useful for complex aggregates with child collections
-- Unit of Work (`SaveChangesAsync`) wraps the write in a transaction
-- EF Core migrations manage schema evolution
-
-### Reads: Dapper
-
-Queries go directly to the database via Dapper because:
-
-- Read models are denormalized projections, not domain objects — they have no behavior
-- Dapper's raw SQL gives full control over query shape and performance
-- No change tracking overhead
-- Queries can span joins and aggregations that are awkward to express in LINQ
+**Reads → Dapper.** Read models are denormalized projections with no behavior, so raw SQL gives full control over query shape with no tracking overhead:
 
 ```csharp
-// GetEventQueryHandler.cs — bypasses EF Core entirely
 await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync();
-const string sql = """
-    SELECT id AS Id, title AS Title, description AS Description,
-           location AS Location, starts_at_utc AS StartsAtUtc, ends_at_utc AS EndsAtUtc
+
+const string sql =
+    """
+    SELECT id AS Id, title AS Title, starts_at_utc AS StartsAtUtc
     FROM events.events
     WHERE id = @EventId
     """;
+
 return await connection.QuerySingleOrDefaultAsync<EventResponse>(sql, request);
 ```
 
-Both paths share the same PostgreSQL connection pool (`NpgsqlDataSource`), so there is no penalty for having two ORMs.
+Both paths share one `NpgsqlDataSource` connection pool, so two ORMs cost nothing extra.
+
+---
+
+## Cross-Cutting Concerns
+
+Registered once in `Common.Application`, applied to every module.
+
+### MediatR Pipeline
+
+```text
+Request ─► ExceptionHandling ─► RequestLogging ─► Validation ─► Handler
+```
+
+- **ExceptionHandlingPipelineBehavior** — wraps unhandled exceptions as `EventlyException`
+- **RequestLoggingPipelineBehavior** — logs start/finish, pushes the module name into the Serilog `LogContext`
+- **ValidationPipelineBehavior** — runs FluentValidation validators; returns a `Result` failure rather than throwing, and only applies to `IBaseCommand` (commands validate, queries don't)
+
+### Other shared services
+
+| Concern | Implementation |
+|---|---|
+| Caching | `ICacheService` over Redis, with in-memory fallback if Redis is unreachable |
+| Clock | `IDateTimeProvider` — makes time testable |
+| Logging | Serilog → Seq, structured, with request logging |
+| Errors | RFC 7807 `ProblemDetails` via `GlobalExceptionHandler` |
+| Health | `/health` aggregating Postgres, Redis, and Keycloak |
+
+---
+
+## Authentication & Authorization
+
+**Keycloak** is the identity provider. Registration is a two-step flow: the user is created in Keycloak first, then persisted locally with the returned `IdentityId`.
+
+**Authentication** — JWT bearer tokens validated against the Keycloak realm (`AddAuthenticationInternal`).
+
+**Authorization** — permission-based rather than role-based. `Role` and `Permission` are modeled in the Users module; at request time `CustomClaimsTransformation` loads the caller's permissions, and a custom `PermissionAuthorizationPolicyProvider` resolves policies on demand:
+
+```csharp
+app.MapGet("users/profile", async (ISender sender) => { /* ... */ })
+   .RequireAuthorization("users:read");
+```
+
+This means new permissions need no policy registration — the string *is* the policy.
 
 ---
 
@@ -267,19 +271,23 @@ Both paths share the same PostgreSQL connection pool (`NpgsqlDataSource`), so th
 | Concern | Technology | Version |
 |---|---|---|
 | Runtime | .NET | 8.0 |
-| Web Framework | ASP.NET Core Minimal APIs | 8.0 |
-| Database | PostgreSQL | 15+ |
-| ORM (writes) | Entity Framework Core + Npgsql | 8.0.4 |
+| API | ASP.NET Core Minimal APIs | 8.0 |
+| Database | PostgreSQL (schema per module) | latest |
+| ORM (writes) | EF Core + Npgsql | 8.0.4 |
 | ORM (reads) | Dapper | 2.1.35 |
-| Mediator / CQRS | MediatR | 12.2.0 |
-| Validation | FluentValidation | 11.9.2 |
-| API Docs | Swashbuckle (Swagger UI) | 6.6.2 |
-| Containerization | Docker + Docker Compose | — |
-| Code Analysis | SonarAnalyzer.CSharp | 9.24.0 |
+| Mediator | MediatR | 12.2.0 |
+| Validation | FluentValidation | 11.9.1 |
+| Messaging | MassTransit (in-memory) | 8.2.1 |
+| Identity | Keycloak + JWT Bearer | 8.0.4 |
+| Cache | Redis (StackExchange) | 8.0.4 |
+| Logging | Serilog + Seq | 8.0.1 |
+| Health | AspNetCore.HealthChecks | 8.0.1 |
+| IDs | Ulid | 1.4.1 |
+| Analysis | SonarAnalyzer.CSharp | 9.24.0 |
 
-### Build Configuration (`Directory.Build.props`)
+### Build Configuration
 
-All projects inherit:
+All projects inherit from `Directory.Build.props`:
 
 ```xml
 <Nullable>enable</Nullable>
@@ -288,85 +296,49 @@ All projects inherit:
 <AnalysisMode>All</AnalysisMode>
 ```
 
-`TreatWarningsAsErrors` is a deliberate choice. It prevents quality debt from accumulating silently — nullable warnings, unused variables, and analyzer findings all fail the build. This is strict but keeps the codebase clean without manual enforcement.
+Strict by design — nullable warnings and analyzer findings fail the build, so quality debt cannot accumulate silently.
 
 ---
 
 ## API Reference
 
-Base URL (development): `http://localhost:5292`
+Swagger UI: `http://localhost:5000/swagger`
 
-Swagger UI: `http://localhost:5292/swagger`
+### Events
 
----
+| Method | Route |
+|---|---|
+| `POST` | `/events` |
+| `GET` | `/events` · `/events/{id}` · `/events/search` |
+| `PUT` | `/events/{id}/publish` · `/events/{id}/reschedule` |
+| `DELETE` | `/events/{id}/cancel` |
+| `POST` / `GET` / `PUT` | `/categories`, `/categories/{id}`, `/categories/{id}/archive` |
+| `POST` / `GET` / `PUT` | `/ticket-types`, `/ticket-types/{id}`, `/ticket-types/{id}/price` |
 
-### Create Event
+### Users
 
-```
-POST /events
-Content-Type: application/json
-```
+| Method | Route | Auth |
+|---|---|---|
+| `POST` | `/users/register` | anonymous |
+| `GET` | `/users/profile` | `users:read` |
+| `PUT` | `/users/{id}/profile` | authenticated |
 
-**Request body:**
+### Ticketing
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `title` | `string` | Yes | Must not be empty |
-| `description` | `string` | Yes | Must not be empty |
-| `location` | `string` | Yes | Must not be empty |
-| `startsAtUtc` | `DateTime` | Yes | UTC timestamp |
-| `endsAtUtc` | `DateTime?` | No | Must be after `startsAtUtc` if provided |
+| Method | Route |
+|---|---|
+| `PUT` | `/carts/add` |
+| `GET` | `/orders/{id}` |
+| `GET` | `/tickets/{id}` · `/tickets/code/{code}` · `/tickets/order/{orderId}` |
 
-**Example:**
+Failures return RFC 7807 Problem Details:
 
 ```json
 {
-  "title": "DDD Europe 2025",
-  "description": "Europe's largest Domain-Driven Design conference",
-  "location": "Amsterdam, Netherlands",
-  "startsAtUtc": "2025-06-10T09:00:00Z",
-  "endsAtUtc": "2025-06-12T18:00:00Z"
-}
-```
-
-**Responses:**
-
-| Status | Body | Description |
-|---|---|---|
-| `200 OK` | `"<guid>"` | Event created; returns the new event ID |
-| `400 Bad Request` | Validation errors | One or more fields failed validation |
-
----
-
-### Get Event
-
-```
-GET /events/{id}
-```
-
-**Path parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `id` | `Guid` | The event ID returned by Create Event |
-
-**Responses:**
-
-| Status | Body | Description |
-|---|---|---|
-| `200 OK` | `EventResponse` | Event found |
-| `404 Not Found` | — | No event with that ID |
-
-**Response body (`EventResponse`):**
-
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "title": "DDD Europe 2025",
-  "description": "Europe's largest Domain-Driven Design conference",
-  "location": "Amsterdam, Netherlands",
-  "startsAtUtc": "2025-06-10T09:00:00Z",
-  "endsAtUtc": "2025-06-12T18:00:00Z"
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+  "title": "Identity.EmailIsNotUnique",
+  "status": 409,
+  "detail": "The specified email is not unique."
 }
 ```
 
@@ -379,235 +351,140 @@ GET /events/{id}
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
-### Option 1: Docker Compose (Recommended)
-
-Starts both the API and a PostgreSQL database. Migrations are applied automatically on startup.
+### Run
 
 ```bash
 docker-compose up --build
 ```
 
-API: `http://localhost:5000`
-Swagger: `http://localhost:5000/swagger`
+Migrations for all three modules are applied automatically on startup in Development.
 
-### Option 2: Local Development
+| Service | URL | Credentials |
+|---|---|---|
+| API / Swagger | http://localhost:5000/swagger | — |
+| Health | http://localhost:5000/health | — |
+| Keycloak | http://localhost:18080 | `admin` / `admin` |
+| Seq (logs) | http://localhost:8081 | — |
+| PostgreSQL | `localhost:5438` | `postgres` / `postgres` |
+| Redis | `localhost:6379` | — |
 
-1. **Start PostgreSQL** (Docker or local install):
+### Set the Keycloak client secret
+
+The confidential client secret is **not** committed. After the realm imports, copy it from
+Keycloak (Clients → `evently-confidential-client` → Credentials) and store it locally:
 
 ```bash
-docker-compose up evently.database
+dotnet user-secrets set "Users:KeyCloak:ConfidentialClientSecret" "<secret>" \
+  --project src/API/Evently.Api
 ```
 
-2. **Run the API:**
+### Smoke test
 
 ```bash
-dotnet run --project src/API/Evently.Api
-```
-
-API: `http://localhost:5292`
-Swagger: `http://localhost:5292/swagger`
-
-Migrations are applied automatically when `ASPNETCORE_ENVIRONMENT=Development` (the default when running locally).
-
-### Verify Installation
-
-```bash
-# Create an event
-curl -X POST http://localhost:5292/events \
+curl -X POST http://localhost:5000/users/register \
   -H "Content-Type: application/json" \
-  -d '{
-    "title": "Test Event",
-    "description": "Hello Evently",
-    "location": "Remote",
-    "startsAtUtc": "2025-12-01T10:00:00Z"
-  }'
-
-# Returns: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-
-# Retrieve it
-curl http://localhost:5292/events/3fa85f64-5717-4562-b3fc-2c963f66afa6
+  -d '{"email":"test@test.com","password":"123456","firstName":"Test","lastName":"User"}'
 ```
 
 ---
 
 ## Configuration
 
-### Connection Strings
+Configuration is layered so each module owns its settings:
 
-| Environment | Key | Location |
-|---|---|---|
-| Development | `ConnectionStrings:Database` | `appsettings.Development.json` |
-| Production | `ConnectionStrings:Database` | Environment variable / secrets manager |
-| Docker | `ConnectionStrings:Database` | `docker-compose.override.yml` env section |
-
-**Development connection string** (connects to the Docker database):
-
-```
-Host=evently.database;Port=5432;Database=evently;Username=postgres;Password=postgres;Include Error Detail=true
+```text
+appsettings.json → appsettings.{Environment}.json
+    → modules.{module}.json → modules.{module}.Development.json
+        → user secrets (Development) → environment variables
 ```
 
-`Include Error Detail=true` exposes PostgreSQL constraint details in exceptions — useful for debugging, never for production.
+`AddModuleConfiguration(["events", "users", "ticketing"])` loads each module's files. User secrets and environment variables are re-added **after** the module files so they always win — otherwise the JSON would silently override them.
 
-### Docker Port Mapping
+### Secrets
 
-| Service | Container Port | Host Port |
-|---|---|---|
-| API (HTTP) | 8080 | 5000 |
-| API (HTTPS) | 8081 | 5001 |
-| PostgreSQL | 5432 | 5438 |
+Never commit credentials. `modules.users.json` ships with empty placeholders; real values go in user secrets locally (mounted into the container by `docker-compose.override.yml`) or environment variables in production:
 
-The database data directory is persisted to `./.containers/db` so the database survives container restarts.
+```dotenv
+Users__KeyCloak__ConfidentialClientSecret=<secret>
+```
 
 ---
 
 ## Database Migrations
 
-EF Core migrations are scoped per module. Each module manages its own schema and its own migrations history table, so modules cannot block each other's schema changes.
+Each module owns its schema and migration history, so modules never block each other:
 
-```
-EventsDbContext → schema: "events"
-Migrations history: events.__EFMigrationsHistory
-```
+| Module | Schema | History table |
+|---|---|---|
+| Events | `events` | `events.__EFMigrationsHistory` |
+| Users | `users` | `users.__EFMigrationsHistory` |
+| Ticketing | `ticketing` | `ticketing.__EFMigrationsHistory` |
 
-### Apply Migrations
-
-**Automatic (development):** Applied on startup via `MigrationExtensions.ApplyMigrations()`.
-
-**Manual:**
+### Add a migration
 
 ```bash
-dotnet ef database update \
-  --project src/Modules/Events/Evently.Modules.Events.Infrastructure \
-  --startup-project src/API/Evently.Api
-```
-
-### Add a New Migration
-
-```bash
-dotnet ef migrations add <MigrationName> \
-  --project src/Modules/Events/Evently.Modules.Events.Infrastructure \
+dotnet ef migrations add <Name> \
+  --context <Module>DbContext \
   --startup-project src/API/Evently.Api \
+  --project src/Modules/<Module>/Evently.Modules.<Module>.Infrastructure \
   --output-dir Database/Migrations
 ```
+
+Package Manager Console equivalent:
+
+```powershell
+Add-Migration <Name> -OutputDir Database\Migrations -Context <Module>DbContext `
+  -StartupProject Evently.Api -Project Evently.Modules.<Module>.Infrastructure
+```
+
+### Resetting in development
+
+Deleting migration files alone causes `42P07: relation already exists` — the tables and history rows survive. Drop the database as well:
+
+```sql
+DROP DATABASE evently WITH (FORCE);
+CREATE DATABASE evently;
+```
+
+Then delete each `Database/Migrations` folder, regenerate `Create_Database` per module, and restart.
+
+> **Keep `Migrations/.editorconfig`.** EF-generated code violates several analyzer rules (`IDE0161`, `S1186`, `S4581`, `CA1861`) that are errors under `TreatWarningsAsErrors`. The folder-scoped `.editorconfig` suppresses them for generated files only.
 
 ---
 
 ## Design Decisions & Trade-offs
 
-### Internal Handlers and Validators
+**`IUnitOfWork` stays module-local.** Each module owns its `DbContext` and transaction boundary, so the abstraction belongs to the module, not Common — preserving module autonomy.
 
-`CreateEventCommandHandler` and `CreateEventCommandValidator` are `internal sealed`. This is intentional:
+**Validation returns `Result`, not exceptions.** `ValidationPipelineBehavior` produces a failure result on the happy path. Exceptions are reserved for the genuinely unexpected, which keeps control flow explicit and cheap.
 
-- **Internal**: They are implementation details of the Application layer. Nothing outside the assembly should depend on them directly.
-- **Sealed**: Prevents inheritance chains that accumulate complexity over time.
-- **Registered with `includeInternalTypes: true`**: FluentValidation's assembly scanning respects the internal visibility.
+**Permission strings as policies.** A custom `PermissionAuthorizationPolicyProvider` resolves policies on demand, so adding a permission requires no startup registration.
 
-MediatR handlers are registered by assembly scanning — they never need to be referenced directly, so making them internal costs nothing and gains a cleaner public API surface.
+**`TryAdd*` for shared infrastructure.** Common uses `TryAddSingleton`/`TryAddScoped` so a module can override a shared service without a duplicate-registration conflict.
 
-### EF Core as Unit of Work
+**Graceful cache degradation.** If Redis is unreachable at startup, the app falls back to an in-memory distributed cache rather than failing to boot.
 
-`EventsDbContext` implements both `DbContext` and `IUnitOfWork`:
+**Snake case naming.** `UseSnakeCaseNamingConvention()` maps PascalCase properties to Postgres columns globally, keeping entities free of database annotations. Dapper queries alias columns explicitly.
 
-```csharp
-public sealed class EventsDbContext(DbContextOptions<EventsDbContext> options)
-    : DbContext(options), IUnitOfWork
-```
-
-The application layer depends on `IUnitOfWork`, not on `EventsDbContext`. This means:
-
-- Application layer has no EF Core reference (only Domain and BCL)
-- The concrete context can be replaced (e.g., with an in-memory fake for testing) without touching any use case handler
-
-### Snake Case Naming Convention
-
-PostgreSQL conventions use `snake_case` for column names; C# uses `PascalCase` for properties. Rather than annotating every property with `[Column("starts_at_utc")]`, the project uses `UseSnakeCaseNamingConvention()` from `EFCore.NamingConventions`. This applies the transformation globally and keeps the entity classes free of database annotations — preserving their status as pure domain objects.
-
-Dapper queries manually alias columns to match C# property names:
-```sql
-SELECT starts_at_utc AS StartsAtUtc FROM events.events
-```
-
-This is a small tax for using Dapper; it is explicit and searchable.
-
-### Module Registration as Public API
-
-`EventsModule.cs` in the Infrastructure layer is the **only public surface** a module exposes to the outside world:
-
-```csharp
-public static class EventsModule
-{
-    public static void MapEndpoints(IEndpointRouteBuilder app) { ... }
-    public static IServiceCollection AddEventsModule(this IServiceCollection services, IConfiguration configuration) { ... }
-}
-```
-
-`Program.cs` calls exactly these two methods and nothing else. This contract is the seam: if the Events module were to become a microservice, `AddEventsModule` becomes a no-op (or registers an HTTP client) and `MapEndpoints` registers a reverse-proxy route — the rest of the solution is unchanged.
-
-### Validation in the Application Layer
-
-`CreateEventCommandValidator` lives in the Application layer, not the Presentation layer. This is deliberate:
-
-- Validation is a business rule, not an HTTP concern (e.g., `EndsAtUtc > StartsAtUtc` is a domain invariant)
-- The validation fires regardless of whether the command arrives via HTTP, a queue consumer, or a test
-- The Presentation layer handles only HTTP binding and HTTP response mapping
+**Endpoints as classes.** Each endpoint is an `IEndpoint` implementation discovered by assembly scanning, so adding one never touches a shared registration file.
 
 ---
 
 ## Known Gaps & Roadmap
 
-The current implementation is a foundation, not a finished product. The following areas are the natural next steps, roughly in priority order.
+**Registration lacks compensation.** `RegisterUserCommandHandler` creates the Keycloak user, then saves locally. If the save fails, the Keycloak user is orphaned and retrying returns `409 EmailIsNotUnique`. Needs a compensating delete or a saga.
 
-### Domain Event Dispatching
+**No outbox.** `PublishDomainEventsInterceptor` dispatches after commit and in-memory, so events are lost if the process dies mid-dispatch. The durable fix is writing events to an outbox table in the same transaction and publishing from a background processor.
 
-Domain events (`EventCreatedDomainEvent`) are **raised** inside the aggregate but never **dispatched**. The dispatch pipeline needs to:
+**In-memory event bus.** MassTransit is configured with the in-memory transport — fine for a single deployable, but integration events do not survive a restart. Swap to RabbitMQ when durability matters.
 
-1. After `SaveChangesAsync`, collect domain events from all tracked entities
-2. Clear events from entities
-3. Publish each event via MediatR (`IPublisher`) or an outbox
+**No inbox / idempotent consumers.** Consumers do not deduplicate, so a redelivered message would be processed twice.
 
-This is typically done by overriding `SaveChangesAsync` in `EventsDbContext` or by a MediatR pipeline behavior.
+**No tests.** The architecture is built for testability — domain logic needs no infrastructure, handlers can be tested against mocked repositories, and integration tests can use Testcontainers.
 
-### Global Exception Handling
+**Ticketing is partially wired.** Domain and handlers exist; several endpoints and the payment integration remain.
 
-There is no exception middleware. An unhandled domain exception or database error returns a 500 with a stack trace in development and a blank 500 in production. The standard approach in Minimal APIs is:
-
-```csharp
-app.UseExceptionHandler(errorApp => { ... });
-```
-
-A production-grade implementation maps exception types to RFC 7807 Problem Details responses.
-
-### FluentValidation Pipeline Behavior
-
-Validators are registered but not automatically invoked before handlers. A MediatR `IPipelineBehavior<TRequest, TResponse>` that runs all validators and short-circuits with a failure result before the handler executes is the standard pattern.
-
-### Structured Logging
-
-`Microsoft.Extensions.Logging` is available by default but no sinks are configured. Adding Serilog with structured JSON output and correlation IDs would make the API observable in production.
-
-### Authentication & Authorization
-
-No authentication or authorization is implemented. Future modules (Users, Tickets) will likely introduce JWT bearer authentication and policy-based authorization.
-
-### Testing
-
-No test projects exist. The architecture is designed for testability:
-
-- Domain logic can be unit tested with zero infrastructure
-- Application handlers can be tested by mocking `IEventRepository` and `IUnitOfWork`
-- Integration tests can spin up a real PostgreSQL instance via Testcontainers
-
-### Future Modules
-
-The template supports adding modules without modifying existing code:
-
-| Module | Responsibility |
-|---|---|
-| `Evently.Modules.Users` | Registration, authentication, profiles |
-| `Evently.Modules.Tickets` | Ticket purchasing, inventory, check-in |
-| `Evently.Modules.Notifications` | Email/SMS confirmations triggered by domain events |
-
-Each module follows the identical four-project structure: Domain / Application / Infrastructure / Presentation.
+**Package versions drift.** `Ulid` is referenced at both 1.3.1 and 1.4.1, FluentValidation at 11.9.1 and 11.9.2. Central Package Management (`Directory.Packages.props`) would consolidate them.
 
 ---
 

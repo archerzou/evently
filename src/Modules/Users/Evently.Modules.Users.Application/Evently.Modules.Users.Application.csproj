@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Folder Include="Abstractions\Identity\" />
+    <Folder Include="Users\GetUserPermissions\" />
   </ItemGroup>
 
 </Project>

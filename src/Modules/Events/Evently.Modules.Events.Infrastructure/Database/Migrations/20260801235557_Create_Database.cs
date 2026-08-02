@@ -6,18 +6,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Evently.Modules.Events.Infrastructure.Database.Migrations
 {
     /// <inheritdoc />
-    public partial class Add_Categories_TicketTypes : Migration
+    public partial class Create_Database : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<Guid>(
-                name: "category_id",
-                schema: "events",
-                table: "events",
-                type: "uuid",
-                nullable: false,
-                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
+            migrationBuilder.EnsureSchema(
+                name: "events");
 
             migrationBuilder.CreateTable(
                 name: "categories",
@@ -31,6 +26,32 @@ namespace Evently.Modules.Events.Infrastructure.Database.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_categories", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "events",
+                schema: "events",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    category_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    title = table.Column<string>(type: "text", nullable: false),
+                    description = table.Column<string>(type: "text", nullable: false),
+                    location = table.Column<string>(type: "text", nullable: false),
+                    starts_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ends_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    status = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_events", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_events_categories_category_id",
+                        column: x => x.category_id,
+                        principalSchema: "events",
+                        principalTable: "categories",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -68,43 +89,22 @@ namespace Evently.Modules.Events.Infrastructure.Database.Migrations
                 schema: "events",
                 table: "ticket_types",
                 column: "event_id");
-
-            migrationBuilder.AddForeignKey(
-                name: "fk_events_categories_category_id",
-                schema: "events",
-                table: "events",
-                column: "category_id",
-                principalSchema: "events",
-                principalTable: "categories",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Cascade);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "fk_events_categories_category_id",
-                schema: "events",
-                table: "events");
-
-            migrationBuilder.DropTable(
-                name: "categories",
-                schema: "events");
-
             migrationBuilder.DropTable(
                 name: "ticket_types",
                 schema: "events");
 
-            migrationBuilder.DropIndex(
-                name: "ix_events_category_id",
-                schema: "events",
-                table: "events");
+            migrationBuilder.DropTable(
+                name: "events",
+                schema: "events");
 
-            migrationBuilder.DropColumn(
-                name: "category_id",
-                schema: "events",
-                table: "events");
+            migrationBuilder.DropTable(
+                name: "categories",
+                schema: "events");
         }
     }
 }

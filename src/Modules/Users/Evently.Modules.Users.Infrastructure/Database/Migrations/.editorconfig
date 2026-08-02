@@ -6,3 +6,5 @@ dotnet_diagnostic.IDE0161.severity = none
 dotnet_diagnostic.S1186.severity = none
 # S4581: "new Guid()" should not be used (EF emits Guid defaults for FK columns)
 dotnet_diagnostic.S4581.severity = none
+# CA1861: Prefer static readonly over constant arrays (EF emits inline arrays for seed data)
+dotnet_diagnostic.CA1861.severity = none

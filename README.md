@@ -61,7 +61,7 @@ Constructs that add ceremony without value are deliberately deferred.
 
 ## Project Structure
 
-```
+```text
 evently/
 ├── src/
 │   ├── API/
@@ -85,7 +85,7 @@ evently/
 
 ### The Dependency Rule
 
-```
+```text
 Common.Domain ◄── Common.Application ◄── Common.Infrastructure
      ▲                    ▲                      ▲
 Module.Domain      Module.Application     Module.Infrastructure
@@ -112,12 +112,19 @@ Every module follows the same template, so adding one is filling in a known shap
 | **PublicApi** | Common.Domain | Cross-module read contracts (`IEventsApi`, `IUsersApi`) |
 | **IntegrationEvents** | Common.Application | Published event contracts (Users only, so far) |
 
-Each module exposes exactly two entry points to the host:
+Each module exposes up to two entry points to the host — registration, plus consumer
+configuration when the module subscribes to integration events:
 
 ```csharp
-public static IServiceCollection AddEventsModule(this IServiceCollection services, IConfiguration configuration);
-public static void ConfigureConsumers(IRegistrationConfigurator registrationConfigurator);   // where applicable
+public static IServiceCollection Add<Module>Module(this IServiceCollection services, IConfiguration configuration);
+public static void ConfigureConsumers(IRegistrationConfigurator registrationConfigurator);
 ```
+
+| Module | `Add<Module>Module` | `ConfigureConsumers` |
+|---|---|---|
+| Events | ✅ | — |
+| Users | ✅ | — |
+| Ticketing | ✅ | ✅ consumes `UserRegisteredIntegrationEvent` |
 
 Endpoints are discovered by assembly scanning (`AddEndpoints`) and mapped globally by `app.MapEndpoints()` — modules never touch the host's routing directly.
 
@@ -131,7 +138,7 @@ Two mechanisms, chosen by whether the caller needs an answer:
 
 **Asynchronous notifications — integration events over MassTransit.** When something noteworthy happens, the owning module publishes an `IntegrationEvent`; interested modules consume it:
 
-```
+```text
 Users:      UserRegisteredDomainEvent → UserRegisteredIntegrationEvent  ──┐
                                                                           │  MassTransit
 Ticketing:  UserRegisteredIntegrationEventConsumer → creates Customer  ◄──┘
@@ -222,7 +229,7 @@ Registered once in `Common.Application`, applied to every module.
 
 ### MediatR Pipeline
 
-```
+```text
 Request ─► ExceptionHandling ─► RequestLogging ─► Validation ─► Handler
 ```
 
@@ -385,7 +392,7 @@ curl -X POST http://localhost:5000/users/register \
 
 Configuration is layered so each module owns its settings:
 
-```
+```text
 appsettings.json → appsettings.{Environment}.json
     → modules.{module}.json → modules.{module}.Development.json
         → user secrets (Development) → environment variables
@@ -397,7 +404,7 @@ appsettings.json → appsettings.{Environment}.json
 
 Never commit credentials. `modules.users.json` ships with empty placeholders; real values go in user secrets locally (mounted into the container by `docker-compose.override.yml`) or environment variables in production:
 
-```
+```dotenv
 Users__KeyCloak__ConfidentialClientSecret=<secret>
 ```
 
